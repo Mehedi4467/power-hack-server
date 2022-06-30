@@ -3,10 +3,14 @@ const cors = require('cors');
 require("dotenv").config();
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const app = express();
+const jwt = require('jsonwebtoken');
 const port = process.env.PORT || 5000;
 
 
-//middleware
+//internal export 
+const { notFoundHandeler, errorHandeler } = require('./middleware/errorHandeler')
+
+
 app.use(cors())
 app.use(express.json())
 
@@ -21,6 +25,10 @@ async function run() {
     try {
         await client.connect();
         const userCollection = client.db("power-hack").collection("user");
+
+
+
+
     }
     finally {
         // await client.close(); 
@@ -33,6 +41,15 @@ run().catch(console.dir);
 app.get('/', (req, res) => {
     res.send("Power hack server is running")
 })
+
+
+//404 page
+app.use(notFoundHandeler);
+// error handling
+app.use(errorHandeler)
+
+
+
 
 app.listen(port, () => {
     console.log('server is running with port', port)
