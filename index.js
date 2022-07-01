@@ -4,6 +4,7 @@ require("dotenv").config();
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const app = express();
 const jwt = require('jsonwebtoken');
+const bcrypt = require("bcrypt");
 const port = process.env.PORT || 5000;
 
 
@@ -15,6 +16,24 @@ app.use(cors())
 app.use(express.json())
 
 
+
+//all user access token verify
+const verifyJwt = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        return res.status(401).send({ message: 'UnAuthorized Access' });
+
+    }
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
+        if (err) {
+            return res.status(403).send({ message: 'Forbidden Access' })
+        }
+        req.decoded = decoded;
+        next();
+    });
+};
+
 //connect mongo db
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.9x7m2.mongodb.net/?retryWrites=true&w=majority`;
@@ -25,10 +44,92 @@ async function run() {
     try {
         await client.connect();
         const userCollection = client.db("power-hack").collection("user");
+        const saltRounds = 10;
+
+
+        const verifyUser = async (req, res, next) => {
+            const requester = req.decoded.email;
+            const requesterAccount = await userCollection.findOne({ email: requester });
+            if (requesterAccount.email === requester) {
+                next();
+            } else {
+                res.status(403).send({ message: 'forbidden' });
+            }
+        };
 
 
 
 
+
+
+
+
+
+
+
+
+        app.post('/registration', async (req, res) => {
+            const userInfo = req.body;
+            const hashedPwd = await bcrypt.hash(userInfo.password, saltRounds);
+            const user = {
+                name: userInfo.name,
+                email: userInfo.email,
+                password: hashedPwd
+            }
+            const result = await userCollection.insertOne(user);
+            res.send(result)
+        });
+
+        app.get('/user/:email', async (req, res) => {
+            const email = req.params.email;
+            const filter = { email: email };
+            const result = await userCollection.findOne(filter);
+            if (result) {
+                const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN, { expiresIn: '30d' });
+                res.send({ result, token });
+            }
+            else {
+                res.send({ result, token: false })
+            }
+        });
+        app.get('/user/auth/me', verifyJwt, async (req, res) => {
+            const email = req.decoded.email;
+            const filter = { email: email };
+            const data = await userCollection.findOne(filter);
+            res.send(data)
+        });
+
+        app.post('/login', async (req, res) => {
+            const email = req.body.email;
+            console.log(email)
+            const filter = { email: email };
+            const user = await userCollection.findOne(filter);
+            console.log(user)
+            if (user) {
+                const cmp = await bcrypt.compare(req.body.password, user.password);
+                console.log(cmp)
+                if (cmp) {
+                    const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN, { expiresIn: '30d' });
+                    res.send({ user, token });
+                }
+                else {
+                    res.send({ token: false, message: "Wrong username or password." });
+                }
+            }
+            else {
+                res.send({ token: false, message: "Wrong username or password." });
+            }
+        })
+
+
+
+
+
+
+        //404 page
+        app.use(notFoundHandeler);
+        // error handling
+        app.use(errorHandeler)
     }
     finally {
         // await client.close(); 
@@ -43,10 +144,7 @@ app.get('/', (req, res) => {
 })
 
 
-//404 page
-app.use(notFoundHandeler);
-// error handling
-app.use(errorHandeler)
+
 
 
 
