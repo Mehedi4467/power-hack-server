@@ -146,13 +146,16 @@ async function run() {
             const bills = await billCollection.find(query).skip(parseInt(pages) * 10).limit(10).toArray();
             res.send(bills);
 
-
-
         });
 
         app.get('/bill/count', verifyJwt, async (req, res) => {
             const bills = await billCollection.estimatedDocumentCount();
-            res.send({ count: bills });
+            const billPaid = await billCollection.find().project({ amount: 1 }).toArray();
+            total = 0;
+            for (let x of billPaid) {
+                total += parseInt(x.amount);
+            }
+            res.send({ count: bills, total: total });
         });
 
         app.put('/update-billing/:id', verifyJwt, async (req, res) => {
