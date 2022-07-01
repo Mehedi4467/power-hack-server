@@ -136,8 +136,16 @@ async function run() {
         })
 
         app.put('/update-billing/:id', verifyJwt, async (req, res) => {
-
-        })
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const bill = req.body;
+            const options = { upsert: true };
+            const updateDoc = {
+                $set: bill,
+            };
+            const result = await billCollection.updateOne(query, updateDoc, options);
+            res.send(result);
+        });
         app.delete('/delete-billing/:id', verifyJwt, async (req, res) => {
             const id = req.params.id;
             const query = { _id: ObjectId(id) };
