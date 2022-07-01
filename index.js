@@ -61,15 +61,6 @@ async function run() {
 
 
 
-
-
-
-
-
-
-
-
-
         app.post('/registration', async (req, res) => {
             const userInfo = req.body;
             const hashedPwd = await bcrypt.hash(userInfo.password, saltRounds);
@@ -131,9 +122,38 @@ async function run() {
 
         });
         app.get('/billing-list', verifyJwt, async (req, res) => {
-            const bills = await billCollection.find().sort({ amount: -1 }).toArray();
+            const pages = req.query.page;
+            const search = req.query.name;
+            const query = {
+
+                $or: [{
+                    name: {
+                        $regex: search.toString(), "$options": "i"
+                    }
+                }, {
+                    email: {
+                        $regex: search.toString(), "$options": "i"
+                    }
+                },
+                {
+                    phone: {
+                        $regex: search.toString(), "$options": "i"
+                    }
+                }
+                ]
+            }
+
+            const bills = await billCollection.find(query).skip(parseInt(pages) * 10).limit(10).toArray();
             res.send(bills);
-        })
+
+
+
+        });
+
+        app.get('/bill/count', verifyJwt, async (req, res) => {
+            const bills = await billCollection.estimatedDocumentCount();
+            res.send({ count: bills });
+        });
 
         app.put('/update-billing/:id', verifyJwt, async (req, res) => {
             const id = req.params.id;
