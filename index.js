@@ -5,6 +5,7 @@ const { MongoClient, ServerApiVersion } = require("mongodb");
 const app = express();
 const jwt = require('jsonwebtoken');
 const bcrypt = require("bcrypt");
+const ObjectId = require('mongodb').ObjectId;
 const port = process.env.PORT || 5000;
 
 
@@ -44,6 +45,7 @@ async function run() {
     try {
         await client.connect();
         const userCollection = client.db("power-hack").collection("user");
+        const billCollection = client.db("power-hack").collection("bill");
         const saltRounds = 10;
 
 
@@ -104,10 +106,10 @@ async function run() {
             console.log(email)
             const filter = { email: email };
             const user = await userCollection.findOne(filter);
-            console.log(user)
+
             if (user) {
                 const cmp = await bcrypt.compare(req.body.password, user.password);
-                console.log(cmp)
+
                 if (cmp) {
                     const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN, { expiresIn: '30d' });
                     res.send({ user, token });
@@ -119,6 +121,28 @@ async function run() {
             else {
                 res.send({ token: false, message: "Wrong username or password." });
             }
+        });
+
+
+        app.post('/add-billing', verifyJwt, async (req, res) => {
+            const bill = req.body;
+            const result = await billCollection.insertOne(bill);
+            res.send(result);
+
+        });
+        app.get('/billing-list', verifyJwt, async (req, res) => {
+            const bills = await billCollection.find().sort({ amount: -1 }).toArray();
+            res.send(bills);
+        })
+
+        app.put('/update-billing/:id', verifyJwt, async (req, res) => {
+
+        })
+        app.delete('/delete-billing/:id', verifyJwt, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const result = await billCollection.deleteOne(query);
+            res.send(result);
         })
 
 
